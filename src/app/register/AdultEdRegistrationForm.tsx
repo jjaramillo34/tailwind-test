@@ -3,7 +3,10 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Event } from "@prisma/client";
 
-type EventWithProgram = Event & { program: string };
+type EventWithProgram = Event & { 
+  program: string;
+  availableTickets: number;
+};
 
 interface AdultEdRegistrationFormProps {
   events: EventWithProgram[];
