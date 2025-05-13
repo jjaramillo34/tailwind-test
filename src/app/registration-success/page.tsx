@@ -138,12 +138,7 @@ function RegistrationSuccessContent() {
         </div>
 
         <div className="text-center">
-          <Link
-            href="/"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            Return to Home
-          </Link>
+          <p className="mb-2 text-sm text-gray-600">Tip: Please print this page for your records.</p>
           {registration.event.program === 'AdultEd' ? (
             <Link
               href="/register-adulted/landing"
