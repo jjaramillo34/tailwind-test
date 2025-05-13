@@ -9,7 +9,10 @@ import { Event } from '@prisma/client';
 import AdultEdRegistrationForm from './AdultEdRegistrationForm';
 import NoAdultEdRegistrationForm from './NoAdultEdRegistrationForm';
 
-type EventWithProgram = Event & { program: string };
+type EventWithProgram = Event & { 
+  program: string;
+  availableTickets: number;
+};
 
 interface RegistrationFormProps {
   events: EventWithProgram[];
