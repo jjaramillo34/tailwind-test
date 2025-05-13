@@ -116,7 +116,7 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
               <label htmlFor="eventId" className="block text-sm font-medium text-gray-700">Select Event</label>
               <select id="eventId" name="eventId" required className="mt-1 block w-full" value={formData.eventId} onChange={handleChange}>
                 <option value="">Select an event</option>
-                {events.map(event => (
+                {events.filter(event => event.availableTickets > 0).map(event => (
                   <option key={event.id} value={event.id}>
                     {event.title} - {new Date(event.date).toLocaleDateString()} (Available: {event.availableTickets})
                   </option>
