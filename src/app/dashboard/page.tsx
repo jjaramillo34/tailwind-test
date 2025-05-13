@@ -20,7 +20,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl w-full mx-auto">
         <h2 className="text-2xl font-bold mb-6">Registrations Dashboard</h2>
         <RegistrationsTable registrations={registrationsForClient} />
       </div>
