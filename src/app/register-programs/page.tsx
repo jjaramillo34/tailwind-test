@@ -32,4 +32,6 @@ async function getNoAdultEdEvents(): Promise<EventWithAvailable[]> {
 export default async function RegisterNoAdultEdPage() {
   const events = await getNoAdultEdEvents();
   return <NoAdultEdRegistrationForm events={events} />;
-} 
+}
+
+export const dynamic = 'force-dynamic'; 
