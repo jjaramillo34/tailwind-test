@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import RegistrationsTable from './RegistrationsTable';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   // Fetch all registrations with event info
   const registrations = await prisma.eventsRegistration.findMany({
