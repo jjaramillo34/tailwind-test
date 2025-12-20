@@ -7,10 +7,14 @@ interface EventWithAvailable extends Event {
 }
 
 async function getAdultEdEvents(): Promise<EventWithAvailable[]> {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
   const events = await prisma.event.findMany({
     where: {
       program: 'AdultEd',
-      date: { gte: new Date() }
+      date: { gte: new Date() },
+      createdAt: { gte: thirtyDaysAgo }
     },
     orderBy: { date: 'asc' }
   });

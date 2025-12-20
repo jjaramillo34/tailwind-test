@@ -88,7 +88,7 @@ export default function NoAdultEdRegistrationForm({ events }: NoAdultEdRegistrat
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h2 className="mb-6 text-center text-2xl font-bold text-gray-900">Event Registration</h2>
+        <h2 className="mb-6 text-center text-2xl font-bold text-gray-900">New Event Registration</h2>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
@@ -133,7 +133,7 @@ export default function NoAdultEdRegistrationForm({ events }: NoAdultEdRegistrat
           {error && <div className="text-red-500 text-sm text-center p-4 bg-red-50 rounded-md">{error}</div>}
           <div>
             <button type="submit" disabled={isSubmitting} className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md">
-              {isSubmitting ? "Registering..." : "Register for Event"}
+              {isSubmitting ? "Registering..." : "Register for New Event"}
             </button>
           </div>
         </form>
