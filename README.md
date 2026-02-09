@@ -105,7 +105,6 @@ A Next.js application for managing and registering for District 79 Arts Grant ev
 |----------|-------------|----------|---------|
 | `MONGODB_URI` | MongoDB connection string | Yes | - |
 | `DATABASE_URL` | Alternative to MONGODB_URI | No | - |
-| `ADMIN_PASSWORD` | Admin dashboard password | Yes | `admin123` |
 
 ## Database Setup
 
