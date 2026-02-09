@@ -2,10 +2,18 @@ import connectDB from '@/lib/mongodb';
 import Event from '@/lib/models/Event';
 import EventsRegistration from '@/lib/models/EventsRegistration';
 import NoAdultEdRegistrationForm from '../register/NoAdultEdRegistrationForm';
-import { IEvent } from '@/lib/models/Event';
-import { Types } from 'mongoose';
 
-interface EventWithAvailable extends IEvent {
+/** Plain object type for events with available ticket count (no Mongoose Document methods). */
+interface EventWithAvailable {
+  _id: string;
+  title: string;
+  description: string;
+  date: Date;
+  location: string;
+  maxSeats: number;
+  program: string;
+  createdAt: Date;
+  updatedAt: Date;
   availableTickets: number;
 }
 
