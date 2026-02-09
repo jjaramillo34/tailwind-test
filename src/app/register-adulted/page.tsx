@@ -1,32 +1,36 @@
-import { prisma } from '@/lib/prisma';
+import connectDB from '@/lib/mongodb';
+import Event from '@/lib/models/Event';
+import EventsRegistration from '@/lib/models/EventsRegistration';
 import AdultEdRegistrationForm from '../register/AdultEdRegistrationForm';
-import { Event } from '@prisma/client';
+import { IEvent } from '@/lib/models/Event';
+import { Types } from 'mongoose';
 
-interface EventWithAvailable extends Event {
+interface EventWithAvailable extends IEvent {
   availableTickets: number;
 }
 
 async function getAdultEdEvents(): Promise<EventWithAvailable[]> {
+  await connectDB();
+  
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
-  const events = await prisma.event.findMany({
-    where: {
-      program: 'AdultEd',
-      date: { gte: new Date() },
-      createdAt: { gte: thirtyDaysAgo }
-    },
-    orderBy: { date: 'asc' }
-  });
+  const events = await Event.find({
+    program: 'AdultEd',
+    date: { $gte: new Date() },
+    createdAt: { $gte: thirtyDaysAgo }
+  }).sort({ date: 'asc' });
 
   // For each event, calculate available tickets
   const eventsWithAvailable = await Promise.all(events.map(async (event) => {
-    const agg = await prisma.eventsRegistration.aggregate({
-      where: { eventId: event.id },
-      _sum: { ticketQuantity: true }
-    });
-    const taken = agg._sum.ticketQuantity || 0;
-    return { ...event, availableTickets: event.maxSeats - taken };
+    const registrations = await EventsRegistration.find({ eventId: event._id });
+    const taken = registrations.reduce((sum, reg) => sum + reg.ticketQuantity, 0);
+    const eventObj = event.toObject();
+    return { 
+      ...eventObj, 
+      _id: eventObj._id.toString(),
+      availableTickets: event.maxSeats - taken 
+    };
   }));
 
   // Only return events with available tickets > 0

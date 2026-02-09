@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import connectDB from '@/lib/mongodb';
+import Event from '@/lib/models/Event';
+import EventsRegistration from '@/lib/models/EventsRegistration';
+import { Types } from 'mongoose';
 
 export async function POST(request: Request) {
   console.log('Registration API called');
   
   try {
+    await connectDB();
+    
     const body = await request.json();
     console.log('Request body:', body);
     
@@ -44,10 +49,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate eventId is a valid ObjectId
+    if (!Types.ObjectId.isValid(eventId)) {
+      return NextResponse.json(
+        { message: 'Invalid event ID' },
+        { status: 400 }
+      );
+    }
+
     // Check if event exists
-    const event = await prisma.event.findUnique({
-      where: { id: parseInt(eventId) },
-    });
+    const event = await Event.findById(eventId);
     console.log('Found event:', event);
     if (!event) {
       console.log('Event not found:', eventId);
@@ -58,11 +69,8 @@ export async function POST(request: Request) {
     }
 
     // Calculate available seats based on sum of ticketQuantity for all registrations
-    const totalTicketsTaken = await prisma.eventsRegistration.aggregate({
-      where: { eventId: parseInt(eventId) },
-      _sum: { ticketQuantity: true }
-    });
-    const ticketsTaken = totalTicketsTaken._sum.ticketQuantity || 0;
+    const registrations = await EventsRegistration.find({ eventId: new Types.ObjectId(eventId) });
+    const ticketsTaken = registrations.reduce((sum, reg) => sum + reg.ticketQuantity, 0);
     const availableSeats = event.maxSeats - ticketsTaken;
     console.log('Available seats:', availableSeats);
 
@@ -75,13 +83,9 @@ export async function POST(request: Request) {
     }
 
     // Check if user has already registered for this event
-    const existingRegistration = await prisma.eventsRegistration.findUnique({
-      where: {
-        email_eventId: {
-          email,
-          eventId: parseInt(eventId)
-        }
-      }
+    const existingRegistration = await EventsRegistration.findOne({
+      email,
+      eventId: new Types.ObjectId(eventId)
     });
 
     if (existingRegistration) {
@@ -92,25 +96,47 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check school limit: total tickets for this school for this event cannot exceed 10
+    const schoolRegistrations = await EventsRegistration.find({
+      school,
+      eventId: new Types.ObjectId(eventId)
+    });
+    const totalTicketsForSchool = schoolRegistrations.reduce((sum, reg) => sum + reg.ticketQuantity, 0);
+    
+    if (totalTicketsForSchool + requestedTickets > 10) {
+      console.log('School ticket limit exceeded:', { school, totalTicketsForSchool, requestedTickets });
+      return NextResponse.json(
+        { message: `Your school has already registered for ${totalTicketsForSchool} ticket${totalTicketsForSchool !== 1 ? 's' : ''} for this event. Maximum 10 tickets per school per event.` },
+        { status: 400 }
+      );
+    }
+
     // Create registration with ticket quantity
-    const registration = await prisma.eventsRegistration.create({
-      data: {
-        firstName,
-        lastName,
-        email,
-        school,
-        position,
-        eventId: parseInt(eventId),
-        ticketQuantity: requestedTickets
-      },
+    const registration = await EventsRegistration.create({
+      firstName,
+      lastName,
+      email,
+      school,
+      position,
+      eventId: new Types.ObjectId(eventId),
+      ticketQuantity: requestedTickets
     });
 
     console.log('Created registration:', registration);
 
     return NextResponse.json({
-      ...registration,
+      id: registration._id.toString(),
+      firstName: registration.firstName,
+      lastName: registration.lastName,
+      email: registration.email,
+      school: registration.school,
+      position: registration.position,
+      ticketQuantity: registration.ticketQuantity,
+      eventId: registration.eventId.toString(),
+      createdAt: registration.createdAt,
+      updatedAt: registration.updatedAt,
       success: true,
-      redirectUrl: `/registration-success?id=${registration.id}`
+      redirectUrl: `/registration-success?id=${registration._id.toString()}`
     });
   } catch (error) {
     console.error('Registration error:', error);
