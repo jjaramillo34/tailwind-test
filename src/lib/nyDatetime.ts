@@ -1,6 +1,36 @@
 /** Eastern Time (New York) — handles EST/EDT via IANA zone. */
 export const NY_TIMEZONE = 'America/New_York';
 
+/**
+ * Some production Node/ICU builds reject certain `Intl` option combinations
+ * (e.g. `timeZoneName` with other fields). Degrade instead of crashing.
+ */
+function nyLocaleFormat(
+  date: Date,
+  format: 'string' | 'date' | 'time',
+  options: Intl.DateTimeFormatOptions
+): string {
+  const run = (o: Intl.DateTimeFormatOptions) => {
+    if (format === 'date') return date.toLocaleDateString('en-US', o);
+    if (format === 'time') return date.toLocaleTimeString('en-US', o);
+    return date.toLocaleString('en-US', o);
+  };
+  try {
+    return run(options);
+  } catch {
+    const { timeZoneName: _omit, ...rest } = options;
+    try {
+      return run(rest);
+    } catch {
+      try {
+        return date.toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+      } catch {
+        return date.toISOString();
+      }
+    }
+  }
+}
+
 function readNyWallTime(ms: number) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: NY_TIMEZONE,
@@ -82,7 +112,9 @@ export function formatDateForDatetimeLocalEastern(date: Date | string): string {
 }
 
 export function formatNyDateLong(date: Date | string): string {
-  return new Date(date).toLocaleDateString('en-US', {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '—';
+  return nyLocaleFormat(d, 'date', {
     timeZone: NY_TIMEZONE,
     weekday: 'long',
     month: 'long',
@@ -92,7 +124,9 @@ export function formatNyDateLong(date: Date | string): string {
 }
 
 export function formatNyTime(date: Date | string): string {
-  return new Date(date).toLocaleTimeString('en-US', {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '—';
+  return nyLocaleFormat(d, 'time', {
     timeZone: NY_TIMEZONE,
     hour: 'numeric',
     minute: 'numeric',
@@ -101,8 +135,10 @@ export function formatNyTime(date: Date | string): string {
 }
 
 export function formatNyDateTimeTable(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '—';
   // Avoid `dateStyle`/`timeStyle` with `timeZoneName` — some runtimes throw "Invalid option".
-  return new Date(date).toLocaleString('en-US', {
+  return nyLocaleFormat(d, 'string', {
     timeZone: NY_TIMEZONE,
     year: 'numeric',
     month: 'numeric',

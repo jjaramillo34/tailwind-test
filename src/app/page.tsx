@@ -12,6 +12,8 @@ interface EventWithAvailable {
   location: string;
   maxSeats: number;
   program: string;
+  /** Omitted on legacy events; treated as active when undefined */
+  isActive?: boolean;
   availableTickets: number;
 }
 
@@ -32,9 +34,12 @@ async function getEvents(): Promise<EventWithAvailable[]> {
       availableTickets
     };
   }));
-  
-  return eventsWithAvailable;
+
+  // Only list active events on the public homepage (defense in depth with `activeEventFilter`).
+  return eventsWithAvailable.filter((e) => e.isActive !== false);
 }
+
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const events = await getEvents();
