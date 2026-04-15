@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {
+  formatDateForDatetimeLocalEastern,
+  formatNyDateTimeTable,
+} from '@/lib/nyDatetime';
 
 interface Event {
   id: string;
@@ -10,6 +14,7 @@ interface Event {
   location: string;
   maxSeats: number;
   program: string;
+  isActive: boolean;
 }
 
 export default function EventsManager() {
@@ -26,6 +31,7 @@ export default function EventsManager() {
     program: 'No-AdultEd',
   });
   const [error, setError] = useState('');
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEvents();
@@ -36,7 +42,12 @@ export default function EventsManager() {
       const response = await fetch('/api/admin/events');
       if (response.ok) {
         const data = await response.json();
-        setEvents(data);
+        setEvents(
+          data.map((e: Event & { isActive?: boolean }) => ({
+            ...e,
+            isActive: e.isActive !== false,
+          }))
+        );
       }
     } catch (err) {
       console.error('Error fetching events:', err);
@@ -81,12 +92,44 @@ export default function EventsManager() {
     setFormData({
       title: event.title,
       description: event.description,
-      date: new Date(event.date).toISOString().slice(0, 16),
+      date: formatDateForDatetimeLocalEastern(event.date),
       location: event.location,
       maxSeats: event.maxSeats.toString(),
       program: event.program,
     });
     setShowForm(true);
+  };
+
+  const handleToggleActive = async (event: Event) => {
+    const next = !event.isActive;
+    if (
+      !next &&
+      !confirm(
+        'Deactivate this event? It will be hidden from the public site and new registrations will be blocked.'
+      )
+    ) {
+      return;
+    }
+
+    setTogglingId(event.id);
+    try {
+      const response = await fetch(`/api/admin/events/${event.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: next }),
+      });
+
+      if (response.ok) {
+        await fetchEvents();
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to update event');
+      }
+    } catch {
+      alert('An error occurred. Please try again.');
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -165,7 +208,7 @@ export default function EventsManager() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Date & Time *
+                Date & Time * <span className="font-normal text-gray-500">(Eastern — New York)</span>
               </label>
               <input
                 type="datetime-local"
@@ -176,6 +219,9 @@ export default function EventsManager() {
                   setFormData({ ...formData, date: e.target.value })
                 }
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the event start time in Eastern Time (EST/EDT). It is stored correctly even if you are not in New York.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -264,19 +310,52 @@ export default function EventsManager() {
               <th className="px-4 py-2 text-left">Location</th>
               <th className="px-4 py-2 text-left">Max Seats</th>
               <th className="px-4 py-2 text-left">Program</th>
+              <th className="px-4 py-2 text-left">Status</th>
               <th className="px-4 py-2 text-left">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {events.map((event) => (
-              <tr key={event.id}>
+              <tr
+                key={event.id}
+                className={event.isActive === false ? 'bg-gray-50 text-gray-600' : ''}
+              >
                 <td className="px-4 py-2">{event.title}</td>
                 <td className="px-4 py-2">
-                  {new Date(event.date).toLocaleString()}
+                  {formatNyDateTimeTable(event.date)}
                 </td>
                 <td className="px-4 py-2">{event.location}</td>
                 <td className="px-4 py-2">{event.maxSeats}</td>
                 <td className="px-4 py-2">{event.program}</td>
+                <td className="px-4 py-2">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        event.isActive !== false
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {event.isActive !== false ? 'Active' : 'Inactive'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(event)}
+                      disabled={togglingId === event.id}
+                      className={`px-3 py-1 rounded text-sm font-medium disabled:opacity-50 ${
+                        event.isActive !== false
+                          ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                          : 'bg-green-100 text-green-900 hover:bg-green-200'
+                      }`}
+                    >
+                      {togglingId === event.id
+                        ? '…'
+                        : event.isActive !== false
+                          ? 'Deactivate'
+                          : 'Activate'}
+                    </button>
+                  </div>
+                </td>
                 <td className="px-4 py-2">
                   <div className="flex gap-2">
                     <button
@@ -297,7 +376,7 @@ export default function EventsManager() {
             ))}
             {events.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500">
+                <td colSpan={7} className="text-center py-8 text-gray-500">
                   No events found. Create your first event!
                 </td>
               </tr>

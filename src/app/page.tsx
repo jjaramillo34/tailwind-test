@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import connectDB from '@/lib/mongodb';
-import Event from '@/lib/models/Event';
+import Event, { activeEventFilter } from '@/lib/models/Event';
 import EventsRegistration from '@/lib/models/EventsRegistration';
+import { formatNyDateLong, formatNyTime } from '@/lib/nyDatetime';
 
 interface EventWithAvailable {
   _id: string;
@@ -16,7 +17,7 @@ interface EventWithAvailable {
 
 async function getEvents(): Promise<EventWithAvailable[]> {
   await connectDB();
-  const events = await Event.find({}).sort({ date: 'asc' });
+  const events = await Event.find(activeEventFilter).sort({ date: 'asc' });
   
   // Calculate available tickets for each event
   const eventsWithAvailable = await Promise.all(events.map(async (event) => {
@@ -32,8 +33,7 @@ async function getEvents(): Promise<EventWithAvailable[]> {
     };
   }));
   
-  // Filter out events with no available tickets
-  return eventsWithAvailable.filter(e => e.availableTickets > 0);
+  return eventsWithAvailable;
 }
 
 export default async function HomePage() {
@@ -130,30 +130,24 @@ export default async function HomePage() {
                     <div className="flex items-center text-gray-600 mb-3">
                       <span className="text-blue-600 mr-2">📅</span>
                       <span className="font-medium">
-                        {new Date(event.date).toLocaleDateString('en-US', { 
-                          weekday: 'long', 
-                          month: 'long', 
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
+                        {formatNyDateLong(event.date)}
                       </span>
                     </div>
                     <div className="flex items-center text-gray-600 mb-3">
                       <span className="text-blue-600 mr-2">🕐</span>
                       <span className="font-medium">
-                        {new Date(event.date).toLocaleTimeString('en-US', { 
-                          hour: 'numeric', 
-                          minute: 'numeric' 
-                        })}
+                        {formatNyTime(event.date)}
                       </span>
                     </div>
                     <div className="flex items-center text-gray-600 mb-4">
                       <span className="text-blue-600 mr-2">📍</span>
                       <span className="text-sm">{event.location}</span>
                     </div>
-                    <div className="bg-blue-50 rounded-lg p-3 mb-4">
-                      <p className="text-blue-700 font-bold text-lg">
-                        {event.availableTickets} Tickets Available
+                    <div className={`rounded-lg p-3 mb-4 ${event.availableTickets > 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
+                      <p className={`font-bold text-lg ${event.availableTickets > 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                        {event.availableTickets > 0
+                          ? `${event.availableTickets} Tickets Available`
+                          : 'Not Available (Sold Out)'}
                       </p>
                     </div>
                     <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">
@@ -191,22 +185,14 @@ export default async function HomePage() {
                     <div className="flex items-center text-gray-600 mb-3">
                       <span className="text-indigo-600 mr-2">📅</span>
                       <span className="font-medium">
-                        {new Date(event.date).toLocaleDateString('en-US', { 
-                          weekday: 'long', 
-                          month: 'long', 
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
+                        {formatNyDateLong(event.date)}
                       </span>
                     </div>
-                    {new Date(event.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric' }) !== 'Invalid Date' && (
+                    {Number.isFinite(new Date(event.date).getTime()) && (
                       <div className="flex items-center text-gray-600 mb-3">
                         <span className="text-indigo-600 mr-2">🕐</span>
                         <span className="font-medium">
-                          {new Date(event.date).toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: 'numeric' 
-                          })}
+                          {formatNyTime(event.date)}
                         </span>
                       </div>
                     )}
@@ -214,9 +200,11 @@ export default async function HomePage() {
                       <span className="text-indigo-600 mr-2">📍</span>
                       <span className="text-sm">{event.location}</span>
                     </div>
-                    <div className="bg-indigo-50 rounded-lg p-3 mb-4">
-                      <p className="text-indigo-700 font-bold text-lg">
-                        {event.availableTickets} Tickets Available
+                    <div className={`rounded-lg p-3 mb-4 ${event.availableTickets > 0 ? 'bg-indigo-50' : 'bg-red-50'}`}>
+                      <p className={`font-bold text-lg ${event.availableTickets > 0 ? 'text-indigo-700' : 'text-red-700'}`}>
+                        {event.availableTickets > 0
+                          ? `${event.availableTickets} Tickets Available`
+                          : 'Not Available (Sold Out)'}
                       </p>
                     </div>
                     <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">

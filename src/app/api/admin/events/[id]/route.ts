@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import Event from '@/lib/models/Event';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { Types } from 'mongoose';
+import { parseDateTimeLocalAsEastern } from '@/lib/nyDatetime';
 
 // GET single event
 export async function GET(
@@ -45,6 +46,7 @@ export async function GET(
       location: event.location,
       maxSeats: event.maxSeats,
       program: event.program,
+      isActive: event.isActive !== false,
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
     });
@@ -74,7 +76,7 @@ export async function PUT(
     await connectDB();
     const { id } = await params;
     const body = await request.json();
-    const { title, description, date, location, maxSeats, program } = body;
+    const { title, description, date, location, maxSeats, program, isActive } = body;
 
     if (!Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -94,10 +96,23 @@ export async function PUT(
     const updateData: any = {};
     if (title) updateData.title = title;
     if (description) updateData.description = description;
-    if (date) updateData.date = new Date(date);
+    if (date) {
+      try {
+        updateData.date = parseDateTimeLocalAsEastern(String(date));
+      } catch {
+        return NextResponse.json(
+          {
+            message:
+              'Invalid date or time. Enter date and time in Eastern Time (New York).',
+          },
+          { status: 400 }
+        );
+      }
+    }
     if (location) updateData.location = location;
     if (maxSeats) updateData.maxSeats = parseInt(maxSeats);
     if (program) updateData.program = program;
+    if (typeof isActive === 'boolean') updateData.isActive = isActive;
 
     const event = await Event.findByIdAndUpdate(id, updateData, { new: true });
 
@@ -116,6 +131,7 @@ export async function PUT(
       location: event.location,
       maxSeats: event.maxSeats,
       program: event.program,
+      isActive: event.isActive !== false,
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
     });

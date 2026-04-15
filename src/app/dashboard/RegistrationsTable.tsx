@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Trash2, Download, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { formatNyDateTimeTable } from '@/lib/nyDatetime';
 
 interface Registration {
   id: string;
@@ -36,7 +37,7 @@ export default function RegistrationsTable({ registrations: initialRegistrations
   ];
   const csvRows = registrations.map(r => [
     r.event.title,
-    new Date(r.event.date).toLocaleDateString(),
+    formatNyDateTimeTable(r.event.date),
     r.event.location,
     r.firstName,
     r.lastName,
@@ -44,7 +45,7 @@ export default function RegistrationsTable({ registrations: initialRegistrations
     r.school,
     r.position,
     r.ticketQuantity,
-    new Date(r.createdAt).toLocaleString()
+    formatNyDateTimeTable(r.createdAt),
   ]);
   const csvContent = [csvHeaders, ...csvRows]
     .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
@@ -236,14 +237,14 @@ export default function RegistrationsTable({ registrations: initialRegistrations
             {paginated.map((r) => (
               <tr key={r.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2 whitespace-nowrap">{r.event.title}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{new Date(r.event.date).toLocaleDateString()}</td>
+                <td className="px-4 py-2 whitespace-nowrap">{formatNyDateTimeTable(r.event.date)}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{r.event.location}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{r.firstName} {r.lastName}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{r.email}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{r.school}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{r.position}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{r.ticketQuantity}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{new Date(r.createdAt).toLocaleString()}</td>
+                <td className="px-4 py-2 whitespace-nowrap">{formatNyDateTimeTable(r.createdAt)}</td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   <button
                     onClick={() => handleDelete(r.id, `${r.firstName} ${r.lastName}`)}

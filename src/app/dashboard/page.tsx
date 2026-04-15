@@ -24,28 +24,39 @@ export default async function DashboardPage() {
     .populate('eventId')
     .sort({ createdAt: 'desc' });
 
-  // Convert dates to string for client component
-  const registrationsForClient = registrations.map(r => ({
-    id: r._id.toString(),
-    firstName: r.firstName,
-    lastName: r.lastName,
-    email: r.email,
-    school: r.school,
-    position: r.position,
-    ticketQuantity: r.ticketQuantity,
-    eventId: r.eventId.toString(),
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-    event: {
-      id: (r.eventId as any)._id.toString(),
-      title: (r.eventId as any).title,
-      description: (r.eventId as any).description,
-      date: (r.eventId as any).date.toISOString(),
-      location: (r.eventId as any).location,
-      maxSeats: (r.eventId as any).maxSeats,
-      program: (r.eventId as any).program,
-    },
-  }));
+  // Convert dates to string for client component.
+  // Some registrations can reference events that were deleted; populate() returns null in that case.
+  const registrationsForClient = registrations.map((r) => {
+    const populatedEvent = r.eventId && typeof r.eventId === 'object' && '_id' in (r.eventId as any)
+      ? (r.eventId as any)
+      : null;
+
+    const fallbackEventId =
+      populatedEvent?._id?.toString?.() ??
+      (r.eventId ? (r.eventId as any).toString?.() : 'deleted-event');
+
+    return {
+      id: r._id.toString(),
+      firstName: r.firstName,
+      lastName: r.lastName,
+      email: r.email,
+      school: r.school,
+      position: r.position,
+      ticketQuantity: r.ticketQuantity,
+      eventId: fallbackEventId,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+      event: {
+        id: fallbackEventId,
+        title: populatedEvent?.title ?? 'Deleted Event',
+        description: populatedEvent?.description ?? 'This event no longer exists.',
+        date: populatedEvent?.date?.toISOString?.() ?? r.createdAt.toISOString(),
+        location: populatedEvent?.location ?? 'N/A',
+        maxSeats: populatedEvent?.maxSeats ?? 0,
+        program: populatedEvent?.program ?? 'N/A',
+      },
+    };
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

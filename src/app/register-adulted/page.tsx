@@ -1,5 +1,5 @@
 import connectDB from '@/lib/mongodb';
-import Event from '@/lib/models/Event';
+import Event, { activeEventFilter } from '@/lib/models/Event';
 import EventsRegistration from '@/lib/models/EventsRegistration';
 import AdultEdRegistrationForm from '../register/AdultEdRegistrationForm';
 
@@ -26,7 +26,8 @@ async function getAdultEdEvents(): Promise<EventWithAvailable[]> {
   const events = await Event.find({
     program: 'AdultEd',
     date: { $gte: new Date() },
-    createdAt: { $gte: thirtyDaysAgo }
+    createdAt: { $gte: thirtyDaysAgo },
+    ...activeEventFilter,
   }).sort({ date: 'asc' });
 
   // For each event, calculate available tickets

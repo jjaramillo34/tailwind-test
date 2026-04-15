@@ -68,6 +68,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (event.isActive === false) {
+      return NextResponse.json(
+        { message: 'Registration is not open for this event' },
+        { status: 400 }
+      );
+    }
+
     // Calculate available seats based on sum of ticketQuantity for all registrations
     const registrations = await EventsRegistration.find({ eventId: new Types.ObjectId(eventId) });
     const ticketsTaken = registrations.reduce((sum, reg) => sum + reg.ticketQuantity, 0);

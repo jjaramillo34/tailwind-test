@@ -64,6 +64,11 @@ export async function POST(request: Request) {
           continue;
         }
 
+        if (event.isActive === false) {
+          errors.push(`Registration is not open for this event: ${eventId}`);
+          continue;
+        }
+
         // Check total tickets for this user across all their registrations for this event
         const allUserRegistrations = await EventsRegistration.find({
           email,

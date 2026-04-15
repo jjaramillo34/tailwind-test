@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { formatNyDateLong, formatNyTime } from '@/lib/nyDatetime';
 
 function RegistrationSuccessContent() {
   const searchParams = useSearchParams();
@@ -192,19 +193,10 @@ function RegistrationSuccessContent() {
                   <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Event Date & Time</h3>
                 </div>
                 <p className="text-xl font-bold text-gray-900 mb-1">
-                  {eventDate.toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    month: 'long', 
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
+                  {formatNyDateLong(eventDate)}
                 </p>
                 <p className="text-lg text-gray-700">
-                  {eventDate.toLocaleTimeString('en-US', { 
-                    hour: 'numeric', 
-                    minute: 'numeric',
-                    hour12: true
-                  })}
+                  {formatNyTime(eventDate)}
                 </p>
               </div>
 
@@ -241,18 +233,10 @@ function RegistrationSuccessContent() {
                   <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Registered On</h3>
                 </div>
                 <p className="text-lg font-semibold text-gray-900">
-                  {registrationDate.toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
+                  {formatNyDateLong(registrationDate)}
                 </p>
                 <p className="text-sm text-gray-600">
-                  {registrationDate.toLocaleTimeString('en-US', { 
-                    hour: 'numeric', 
-                    minute: 'numeric',
-                    hour12: true
-                  })}
+                  {formatNyTime(registrationDate)}
                 </p>
               </div>
             </div>

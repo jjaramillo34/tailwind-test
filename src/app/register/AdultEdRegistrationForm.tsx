@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { formatNyDateLong, formatNyTime } from "@/lib/nyDatetime";
 
 type EventWithProgram = {
   _id: string;
@@ -158,7 +159,7 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
                 <option value="">Select an event</option>
                 {events.filter(event => event.availableTickets > 0).map(event => (
                   <option key={event._id} value={event._id}>
-                    {event.title} - {new Date(event.date).toLocaleDateString()} (Available: {event.availableTickets})
+                    {event.title} - {formatNyDateLong(event.date)} at {formatNyTime(event.date)} (Available: {event.availableTickets})
                   </option>
                 ))}
               </select>

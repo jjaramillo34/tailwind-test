@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Event from '@/lib/models/Event';
 import { isAdminAuthenticated } from '@/lib/auth';
-import { Types } from 'mongoose';
+import { parseDateTimeLocalAsEastern } from '@/lib/nyDatetime';
 
 // GET all events
 export async function GET() {
@@ -27,6 +27,7 @@ export async function GET() {
         location: event.location,
         maxSeats: event.maxSeats,
         program: event.program,
+        isActive: event.isActive !== false,
         createdAt: event.createdAt.toISOString(),
         updatedAt: event.updatedAt.toISOString(),
       }))
@@ -71,10 +72,23 @@ export async function POST(request: Request) {
       );
     }
 
+    let eventDate: Date;
+    try {
+      eventDate = parseDateTimeLocalAsEastern(String(date));
+    } catch {
+      return NextResponse.json(
+        {
+          message:
+            'Invalid date or time. Enter date and time in Eastern Time (New York).',
+        },
+        { status: 400 }
+      );
+    }
+
     const event = await Event.create({
       title,
       description,
-      date: new Date(date),
+      date: eventDate,
       location,
       maxSeats: parseInt(maxSeats),
       program,
@@ -88,6 +102,7 @@ export async function POST(request: Request) {
       location: event.location,
       maxSeats: event.maxSeats,
       program: event.program,
+      isActive: event.isActive !== false,
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
     });

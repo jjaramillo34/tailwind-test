@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { formatNyDateLong, formatNyTime } from "@/lib/nyDatetime";
 
 type EventWithProgram = {
   _id: string;
@@ -325,15 +326,7 @@ export default function NoAdultEdRegistrationForm({ events }: NoAdultEdRegistrat
                         <div className="flex-1">
                           <h4 className="font-bold text-gray-900 mb-1">{se.event.title}</h4>
                           <p className="text-sm text-gray-600">
-                            {new Date(se.event.date).toLocaleDateString('en-US', { 
-                              weekday: 'long', 
-                              month: 'long', 
-                              day: 'numeric',
-                              year: 'numeric'
-                            })} at {new Date(se.event.date).toLocaleTimeString('en-US', { 
-                              hour: 'numeric', 
-                              minute: 'numeric' 
-                            })}
+                            {formatNyDateLong(se.event.date)} at {formatNyTime(se.event.date)}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">{se.event.location}</p>
                         </div>
@@ -396,14 +389,7 @@ export default function NoAdultEdRegistrationForm({ events }: NoAdultEdRegistrat
                           <h4 className="font-bold text-gray-900">{event.title}</h4>
                         </div>
                         <p className="text-sm text-gray-600 mb-2">
-                          {new Date(event.date).toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric',
-                            year: 'numeric'
-                          })} at {new Date(event.date).toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: 'numeric' 
-                          })}
+                          {formatNyDateLong(event.date)} at {formatNyTime(event.date)}
                         </p>
                         <p className="text-xs text-gray-500 mb-2">{event.location}</p>
                       </div>
