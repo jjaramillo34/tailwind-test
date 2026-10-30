@@ -1,15 +1,51 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  Button,
+  Column,
+  Feedback,
+  Heading,
+  PasswordInput,
+  Row,
+  Text,
+} from '@once-ui-system/core';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+
+type Message = { type: 'success' | 'error'; text: string } | null;
+
+function MessageFeedback({ message }: { message: Message }) {
+  if (!message) return null;
+  return <Feedback variant={message.type === 'success' ? 'success' : 'danger'} description={message.text} />;
+}
+
+function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return (
+    <Column background="surface" border radius="l" padding="24" gap="20">
+      <Column gap="4">
+        <Heading as="h3" variant="heading-strong-m">
+          {title}
+        </Heading>
+        <Text variant="body-default-s" onBackground="neutral-weak">
+          {description}
+        </Text>
+      </Column>
+      {children}
+    </Column>
+  );
+}
 
 export default function SettingsTab() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<Message>(null);
   const [loading, setLoading] = useState(false);
   const [cleanupLoading, setCleanupLoading] = useState(false);
-  const [cleanupMessage, setCleanupMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [cleanupMessage, setCleanupMessage] = useState<Message>(null);
+  const [confirmCleanup, setConfirmCleanup] = useState(false);
+
+  const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,10 +90,6 @@ export default function SettingsTab() {
   };
 
   const handleCleanupOrphans = async () => {
-    if (!confirm('Delete registrations linked to events that no longer exist?')) {
-      return;
-    }
-
     setCleanupLoading(true);
     setCleanupMessage(null);
 
@@ -85,117 +117,100 @@ export default function SettingsTab() {
       });
     } finally {
       setCleanupLoading(false);
+      setConfirmCleanup(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-xl font-bold mb-6">Settings</h3>
+    <Column gap="24" maxWidth="s">
+      <Heading as="h2" variant="heading-strong-l">
+        Settings
+      </Heading>
 
-      <div className="max-w-2xl">
-        <div className="mb-8">
-          <h4 className="text-lg font-semibold mb-4">Change Admin Password</h4>
-          <form onSubmit={handlePasswordChange} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Current Password
-              </label>
-              <input
-                type="password"
-                required
-                className="w-full border rounded px-3 py-2"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                New Password
-              </label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                className="w-full border rounded px-3 py-2"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Confirm New Password
-              </label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                className="w-full border rounded px-3 py-2"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-            {message && (
-              <div
-                className={`p-3 rounded ${
-                  message.type === 'success'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
-                }`}
-              >
-                {message.text}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {loading ? 'Changing...' : 'Change Password'}
-            </button>
-          </form>
-        </div>
+      <Section title="Change admin password" description="Use at least 6 characters.">
+        <form onSubmit={handlePasswordChange}>
+          <Column gap="16">
+            <PasswordInput
+              id="current-password"
+              label="Current password"
+              autoComplete="current-password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+            <PasswordInput
+              id="new-password"
+              label="New password"
+              autoComplete="new-password"
+              required
+              minLength={6}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <PasswordInput
+              id="confirm-password"
+              label="Confirm new password"
+              autoComplete="new-password"
+              required
+              minLength={6}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              error={mismatch}
+              errorMessage={mismatch ? 'Passwords do not match' : undefined}
+            />
+            <MessageFeedback message={message} />
+            <Row>
+              <Button type="submit" loading={loading} disabled={loading}>
+                {loading ? 'Changing…' : 'Change password'}
+              </Button>
+            </Row>
+          </Column>
+        </form>
+      </Section>
 
-        <div className="border-t pt-6">
-          <h4 className="text-lg font-semibold mb-4">Data Maintenance</h4>
-          <p className="text-sm text-gray-600 mb-3">
-            Remove registrations that reference events that were deleted.
-          </p>
-          <button
-            type="button"
-            onClick={handleCleanupOrphans}
-            disabled={cleanupLoading}
-            className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+      <Section
+        title="Data maintenance"
+        description="Remove registrations that reference events that were deleted."
+      >
+        <Row>
+          <Button
+            variant="warning"
+            prefixIcon="trash"
+            onClick={() => setConfirmCleanup(true)}
+            loading={cleanupLoading}
           >
-            {cleanupLoading ? 'Cleaning...' : 'Clean Orphan Registrations'}
-          </button>
-          {cleanupMessage && (
-            <div
-              className={`mt-3 p-3 rounded ${
-                cleanupMessage.type === 'success'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-red-100 text-red-700'
-              }`}
-            >
-              {cleanupMessage.text}
-            </div>
-          )}
-        </div>
+            Clean orphan registrations
+          </Button>
+        </Row>
+        <MessageFeedback message={cleanupMessage} />
+      </Section>
 
-        <div className="border-t pt-6 mt-6">
-          <h4 className="text-lg font-semibold mb-4">System Information</h4>
-          <div className="space-y-2 text-sm text-gray-600">
-            <p>
-              <strong>Database:</strong> MongoDB
-            </p>
-            <p>
-              <strong>Event Management:</strong> Full CRUD operations available
-            </p>
-            <p className="text-xs text-gray-500 mt-4">
-              Passwords are securely hashed and stored in the database. Use the form above to change your password.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+      <Section
+        title="System information"
+        description="Passwords are securely hashed and stored in the database."
+      >
+        <Column gap="8">
+          <Row gap="8">
+            <Text variant="label-strong-s">Database</Text>
+            <Text variant="body-default-s" onBackground="neutral-weak">MongoDB</Text>
+          </Row>
+          <Row gap="8">
+            <Text variant="label-strong-s">Event management</Text>
+            <Text variant="body-default-s" onBackground="neutral-weak">Full CRUD operations available</Text>
+          </Row>
+        </Column>
+      </Section>
+
+      <ConfirmDialog
+        open={confirmCleanup}
+        onClose={() => setConfirmCleanup(false)}
+        loading={cleanupLoading}
+        tone="danger"
+        title="Clean orphan registrations?"
+        description="Registrations linked to events that no longer exist will be permanently deleted."
+        confirmLabel="Delete orphans"
+        onConfirm={handleCleanupOrphans}
+      />
+    </Column>
   );
 }

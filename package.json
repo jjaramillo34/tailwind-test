@@ -11,6 +11,7 @@
     "seed-admins": "tsx prisma/seed-admins.ts"
   },
   "dependencies": {
+    "@once-ui-system/core": "^2.6.0",
     "@types/bcrypt": "^6.0.0",
     "@vercel/analytics": "^1.6.1",
     "bcrypt": "^6.0.0",
@@ -25,12 +26,9 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "autoprefixer": "^10.4.21",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
     "tsx": "^4.7.0",
     "typescript": "^5"

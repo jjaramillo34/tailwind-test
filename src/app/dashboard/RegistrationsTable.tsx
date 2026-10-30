@@ -1,8 +1,21 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { Trash2, Download, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import {
+  Button,
+  Column,
+  Heading,
+  Icon,
+  IconButton,
+  Input,
+  Row,
+  Select,
+  Table,
+  Text,
+  useToast,
+} from '@once-ui-system/core';
 import { formatNyDateTimeTable } from '@/lib/nyDatetime';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface Registration {
   id: string;
@@ -21,21 +34,51 @@ interface Registration {
 }
 
 const PAGE_SIZE = 10;
+const ALL_EVENTS = '__all__';
 
-export default function RegistrationsTable({ registrations: initialRegistrations }: { registrations: Registration[] }) {
-  const router = useRouter();
-  const [registrations, setRegistrations] = useState<Registration[]>(initialRegistrations);
-  const [searchEvent, setSearchEvent] = useState('');
-  const [searchEmail, setSearchEmail] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState<'event' | 'email' | 'date' | 'name' | 'tickets' | 'createdAt'>('createdAt');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+// Sorting happens here, not in Table: Table compares the displayed text, which
+// puts "10/1/2026" before "9/30/2026" and ignores AM/PM.
+type SortKey = 'createdAt-desc' | 'createdAt-asc' | 'date-asc' | 'date-desc' | 'event' | 'name' | 'email' | 'tickets';
 
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'createdAt-desc', label: 'Newest registrations' },
+  { value: 'createdAt-asc', label: 'Oldest registrations' },
+  { value: 'date-asc', label: 'Event date (soonest)' },
+  { value: 'date-desc', label: 'Event date (latest)' },
+  { value: 'event', label: 'Event name (A–Z)' },
+  { value: 'name', label: 'Last name (A–Z)' },
+  { value: 'email', label: 'Email (A–Z)' },
+  { value: 'tickets', label: 'Most tickets' },
+];
+
+function compare(a: Registration, b: Registration, sortBy: SortKey): number {
+  const time = (s: string) => new Date(s).getTime();
+  switch (sortBy) {
+    case 'createdAt-asc':
+      return time(a.createdAt) - time(b.createdAt);
+    case 'date-asc':
+      return time(a.event.date) - time(b.event.date);
+    case 'date-desc':
+      return time(b.event.date) - time(a.event.date);
+    case 'event':
+      return a.event.title.localeCompare(b.event.title);
+    case 'name':
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName);
+    case 'email':
+      return a.email.localeCompare(b.email);
+    case 'tickets':
+      return b.ticketQuantity - a.ticketQuantity;
+    case 'createdAt-desc':
+    default:
+      return time(b.createdAt) - time(a.createdAt);
+  }
+}
+
+function toCsv(rows: Registration[]): string {
   const csvHeaders = [
     'Event', 'Date', 'Location', 'First Name', 'Last Name', 'Email', 'School', 'Position', 'Tickets', 'Registered At'
   ];
-  const csvRows = registrations.map(r => [
+  const csvRows = rows.map(r => [
     r.event.title,
     formatNyDateTimeTable(r.event.date),
     r.event.location,
@@ -47,253 +90,211 @@ export default function RegistrationsTable({ registrations: initialRegistrations
     r.ticketQuantity,
     formatNyDateTimeTable(r.createdAt),
   ]);
-  const csvContent = [csvHeaders, ...csvRows]
+  return [csvHeaders, ...csvRows]
     .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
     .join('\n');
+}
 
-  // Filtering
-  const filtered = useMemo(() => {
-    return registrations.filter(r =>
-      r.event.title.toLowerCase().includes(searchEvent.toLowerCase()) &&
-      r.email.toLowerCase().includes(searchEmail.toLowerCase())
-    );
-  }, [registrations, searchEvent, searchEmail]);
+export default function RegistrationsTable({ registrations: initialRegistrations }: { registrations: Registration[] }) {
+  const router = useRouter();
+  const { addToast } = useToast();
+  const [registrations, setRegistrations] = useState<Registration[]>(initialRegistrations);
+  const [eventFilter, setEventFilter] = useState(ALL_EVENTS);
+  const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('createdAt-desc');
+  const [pendingDelete, setPendingDelete] = useState<Registration | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Sorting
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      let aValue: any, bValue: any;
-      switch (sortBy) {
-        case 'event':
-          aValue = a.event.title.toLowerCase();
-          bValue = b.event.title.toLowerCase();
-          break;
-        case 'email':
-          aValue = a.email.toLowerCase();
-          bValue = b.email.toLowerCase();
-          break;
-        case 'date':
-          aValue = new Date(a.event.date).getTime();
-          bValue = new Date(b.event.date).getTime();
-          break;
-        case 'name':
-          aValue = a.lastName.toLowerCase() + a.firstName.toLowerCase();
-          bValue = b.lastName.toLowerCase() + b.firstName.toLowerCase();
-          break;
-        case 'tickets':
-          aValue = a.ticketQuantity;
-          bValue = b.ticketQuantity;
-          break;
-        case 'createdAt':
-        default:
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
-      }
-      if (aValue < bValue) return sortDir === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filtered, sortBy, sortDir]);
+  const eventOptions = useMemo(() => {
+    const titles = Array.from(new Set(registrations.map(r => r.event.title))).sort();
+    return [
+      { value: ALL_EVENTS, label: 'All events' },
+      ...titles.map(title => ({ value: title, label: title })),
+    ];
+  }, [registrations]);
 
-  // Pagination
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return registrations
+      .filter(r => eventFilter === ALL_EVENTS || r.event.title === eventFilter)
+      .filter(r =>
+        !q ||
+        [r.firstName, r.lastName, r.email, r.school, r.position, r.event.title]
+          .some(field => field.toLowerCase().includes(q))
+      )
+      .sort((a, b) => compare(a, b, sortBy));
+  }, [registrations, eventFilter, query, sortBy]);
 
-  // Sorting handler
-  const handleSort = (col: typeof sortBy) => {
-    if (sortBy === col) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(col);
-      setSortDir('asc');
-    }
+  const isFiltered = eventFilter !== ALL_EVENTS || query.trim() !== '';
+  const visibleTickets = visible.reduce((sum, r) => sum + r.ticketQuantity, 0);
+
+  const downloadCsv = () => {
+    const blob = new Blob([toCsv(visible)], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'registrations.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const clearFilters = () => {
+    setEventFilter(ALL_EVENTS);
+    setQuery('');
   };
 
   // Delete handler
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete the registration for ${name}? This action cannot be undone.`)) {
-      return;
-    }
-
-    setDeletingId(id);
+  const handleDelete = async (registration: Registration) => {
+    const name = `${registration.firstName} ${registration.lastName}`;
+    setDeleting(true);
     try {
-      const response = await fetch(`/api/admin/registrations/${id}`, {
+      const response = await fetch(`/api/admin/registrations/${registration.id}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
         // Remove from local state immediately for better UX
-        setRegistrations(prev => prev.filter(r => r.id !== id));
+        setRegistrations(prev => prev.filter(r => r.id !== registration.id));
+        addToast({ variant: 'success', message: `Registration for ${name} deleted` });
         // Refresh the page to sync with server
         setTimeout(() => router.refresh(), 500);
       } else {
         const data = await response.json();
-        alert(data.message || 'Failed to delete registration');
+        addToast({ variant: 'danger', message: data.message || 'Failed to delete registration' });
       }
     } catch (error) {
       console.error('Error deleting registration:', error);
-      alert('An error occurred while deleting the registration');
+      addToast({ variant: 'danger', message: 'An error occurred while deleting the registration' });
     } finally {
-      setDeletingId(null);
+      setDeleting(false);
+      setPendingDelete(null);
     }
   };
 
   return (
-    <>
-      <div className="flex flex-col md:flex-row md:items-center md:space-x-4 mb-4 gap-2">
-        <div className="relative flex-1 md:max-w-xs">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Filter by event title..."
-            value={searchEvent}
-            onChange={e => { setSearchEvent(e.target.value); setPage(1); }}
-            className="border rounded px-3 py-2 pl-10 w-full"
+    <Column gap="20">
+      <Row horizontal="between" vertical="end" gap="16" s={{ direction: 'column', horizontal: 'start' }}>
+        <Column gap="4">
+          <Heading as="h2" variant="heading-strong-l">
+            Registrations
+          </Heading>
+          <Text variant="body-default-s" onBackground="neutral-weak">
+            {isFiltered
+              ? `${visible.length} of ${registrations.length} registrations · ${visibleTickets} tickets`
+              : `${registrations.length} registrations · ${visibleTickets} tickets`}
+          </Text>
+        </Column>
+        <Button prefixIcon="download" variant="secondary" onClick={downloadCsv} disabled={visible.length === 0}>
+          {isFiltered ? `Export ${visible.length} to CSV` : 'Export CSV'}
+        </Button>
+      </Row>
+
+      <Row gap="12" fillWidth vertical="center" m={{ direction: 'column', vertical: 'stretch' }}>
+        <Row fillWidth>
+          <Input
+            id="registrations-search"
+            label="Search registrations"
+            placeholder="Search name, email, school…"
+            size="xs"
+            prefix={<Icon name="search" size="xs" onBackground="neutral-weak" />}
+            suffix={query ? (
+              <IconButton icon="close" variant="ghost" size="s" tooltip="Clear search" ariaLabel="Clear search" onClick={() => setQuery('')} />
+            ) : undefined}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
           />
-          {searchEvent && (
-            <button
-              onClick={() => setSearchEvent('')}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="relative flex-1 md:max-w-xs">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Filter by email..."
-            value={searchEmail}
-            onChange={e => { setSearchEmail(e.target.value); setPage(1); }}
-            className="border rounded px-3 py-2 pl-10 w-full"
+        </Row>
+        <Row fillWidth>
+          <Select
+            id="registrations-event"
+            label="Event"
+            size="xs"
+            searchable
+            options={eventOptions}
+            value={eventFilter}
+            onSelect={value => setEventFilter(value as string)}
           />
-          {searchEmail && (
-            <button
-              onClick={() => setSearchEmail('')}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <button
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 mt-2 md:mt-0 flex items-center gap-2"
-          onClick={() => {
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'registrations.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          <Download className="h-4 w-4" />
-          Download CSV
-        </button>
-      </div>
-      <div className="overflow-x-auto bg-white rounded-lg shadow-lg w-full border border-gray-200">
-        <table className="min-w-full w-full divide-y divide-gray-200">
-          <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200" onClick={() => handleSort('event')}>
-                <div className="flex items-center">
-                  Event {sortBy === 'event' && (sortDir === 'asc' ? '▲' : '▼')}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
-                <div className="flex items-center">
-                  Date {sortBy === 'date' && (sortDir === 'asc' ? '▲' : '▼')}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Location</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200" onClick={() => handleSort('name')}>
-                <div className="flex items-center">
-                  Name {sortBy === 'name' && (sortDir === 'asc' ? '▲' : '▼')}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200" onClick={() => handleSort('email')}>
-                <div className="flex items-center">
-                  Email {sortBy === 'email' && (sortDir === 'asc' ? '▲' : '▼')}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">School</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Position</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200" onClick={() => handleSort('tickets')}>
-                <div className="flex items-center">
-                  Tickets {sortBy === 'tickets' && (sortDir === 'asc' ? '▲' : '▼')}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200" onClick={() => handleSort('createdAt')}>
-                <div className="flex items-center">
-                  Registered At {sortBy === 'createdAt' && (sortDir === 'asc' ? '▲' : '▼')}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {paginated.map((r) => (
-              <tr key={r.id} className="hover:bg-gray-50">
-                <td className="px-4 py-2 whitespace-nowrap">{r.event.title}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{formatNyDateTimeTable(r.event.date)}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{r.event.location}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{r.firstName} {r.lastName}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{r.email}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{r.school}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{r.position}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{r.ticketQuantity}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{formatNyDateTimeTable(r.createdAt)}</td>
-                <td className="px-4 py-2 whitespace-nowrap">
-                  <button
-                    onClick={() => handleDelete(r.id, `${r.firstName} ${r.lastName}`)}
-                    disabled={deletingId === r.id}
-                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-red-200"
-                    title="Delete registration"
-                  >
-                    {deletingId === r.id ? (
-                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : (
-                      <Trash2 className="h-5 w-5" />
-                    )}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {paginated.length === 0 && (
-              <tr>
-                <td colSpan={10} className="text-center py-8 text-gray-500">No registrations found.</td>
-              </tr>
+        </Row>
+        <Row fillWidth>
+          <Select
+            id="registrations-sort"
+            label="Sort by"
+            size="xs"
+            options={SORT_OPTIONS}
+            value={sortBy}
+            onSelect={value => setSortBy(value as SortKey)}
+          />
+        </Row>
+      </Row>
+
+      <Table
+        // Remount on filter change so pagination returns to page 1.
+        key={`${eventFilter}|${query}|${sortBy}`}
+        paginated
+        defaultPageSize={PAGE_SIZE}
+        data={{
+          headers: [
+            { content: 'Registrant', key: 'name' },
+            { content: 'Event', key: 'event' },
+            { content: 'School', key: 'school', hide: { m: true } },
+            { content: 'Tickets', key: 'tickets', align: 'right' },
+            { content: 'Registered', key: 'createdAt', hide: { s: true } },
+          ],
+          rows: visible.map((r) => [
+            <Column key="name" gap="2">
+              <Text variant="label-strong-s">{r.firstName} {r.lastName}</Text>
+              <Text variant="body-default-xs" onBackground="neutral-weak">{r.email}</Text>
+            </Column>,
+            <Column key="event" gap="2">
+              <Text variant="label-default-s">{r.event.title}</Text>
+              <Text variant="body-default-xs" onBackground="neutral-weak">
+                {formatNyDateTimeTable(r.event.date)} · {r.event.location}
+              </Text>
+            </Column>,
+            <Column key="school" gap="2">
+              <Text variant="body-default-s">{r.school}</Text>
+              <Text variant="body-default-xs" onBackground="neutral-weak">{r.position}</Text>
+            </Column>,
+            r.ticketQuantity,
+            formatNyDateTimeTable(r.createdAt),
+          ]),
+        }}
+        actions={[
+          {
+            icon: 'trash',
+            tooltip: 'Delete registration',
+            variant: 'danger',
+            onClick: (row) => setPendingDelete(visible[row]),
+          },
+        ]}
+        emptyState={
+          <Column center gap="12" padding="32">
+            <Text variant="body-default-s" onBackground="neutral-weak">
+              {isFiltered ? 'No registrations match these filters.' : 'No registrations yet.'}
+            </Text>
+            {isFiltered && (
+              <Button size="s" variant="secondary" onClick={clearFilters}>
+                Clear filters
+              </Button>
             )}
-          </tbody>
-        </table>
-      </div>
-      {/* Pagination Controls */}
-      <div className="flex justify-between items-center mt-4">
-        <div className="text-sm text-gray-600">
-          Page {page} of {totalPages || 1}
-        </div>
-        <div className="space-x-2">
-          <button
-            className="px-3 py-1 rounded border bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            Previous
-          </button>
-          <button
-            className="px-3 py-1 rounded border bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || totalPages === 0}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-    </>
+          </Column>
+        }
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        loading={deleting}
+        tone="danger"
+        title="Delete registration?"
+        description={
+          pendingDelete
+            ? `The registration for ${pendingDelete.firstName} ${pendingDelete.lastName} (${pendingDelete.event.title}, ${pendingDelete.ticketQuantity} tickets) will be removed. This can't be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={() => pendingDelete && handleDelete(pendingDelete)}
+      />
+    </Column>
   );
-} 
+}
