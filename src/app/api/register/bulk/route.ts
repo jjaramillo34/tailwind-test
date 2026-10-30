@@ -171,7 +171,8 @@ export async function POST(request: Request) {
         });
 
       } catch (error) {
-        console.error(`Error processing registration for event ${eventId}:`, error);
+        // eventId comes from the request: pass it as an argument, not in the format string.
+        console.error('Error processing registration for event %s:', eventId, error);
         errors.push(`Error registering for event: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
