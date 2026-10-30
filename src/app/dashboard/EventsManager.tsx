@@ -2,9 +2,27 @@
 
 import { useState, useEffect } from 'react';
 import {
+  Button,
+  Column,
+  Dialog,
+  Feedback,
+  Grid,
+  Heading,
+  Input,
+  Row,
+  SegmentedControl,
+  Switch,
+  Table,
+  Tag,
+  Text,
+  Textarea,
+  useToast,
+} from '@once-ui-system/core';
+import {
   formatDateForDatetimeLocalEastern,
   formatNyDateTimeTable,
 } from '@/lib/nyDatetime';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface Event {
   id: string;
@@ -17,7 +35,15 @@ interface Event {
   isActive: boolean;
 }
 
+const PROGRAM_OPTIONS = [
+  { value: 'No-AdultEd', label: 'Programs (No-AdultEd)' },
+  { value: 'AdultEd', label: 'AdultEd' },
+];
+
+type PendingAction = { kind: 'delete' | 'deactivate'; event: Event } | null;
+
 export default function EventsManager() {
+  const { addToast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -31,7 +57,10 @@ export default function EventsManager() {
     program: 'No-AdultEd',
   });
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     fetchEvents();
@@ -59,6 +88,7 @@ export default function EventsManager() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSaving(true);
 
     try {
       const url = editingEvent
@@ -77,6 +107,10 @@ export default function EventsManager() {
 
       if (response.ok) {
         await fetchEvents();
+        addToast({
+          variant: 'success',
+          message: editingEvent ? `“${formData.title}” updated` : `“${formData.title}” created`,
+        });
         resetForm();
       } else {
         const data = await response.json();
@@ -84,6 +118,8 @@ export default function EventsManager() {
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -97,20 +133,11 @@ export default function EventsManager() {
       maxSeats: event.maxSeats.toString(),
       program: event.program,
     });
+    setError('');
     setShowForm(true);
   };
 
-  const handleToggleActive = async (event: Event) => {
-    const next = !event.isActive;
-    if (
-      !next &&
-      !confirm(
-        'Deactivate this event? It will be hidden from the public site and new registrations will be blocked.'
-      )
-    ) {
-      return;
-    }
-
+  const setActive = async (event: Event, next: boolean) => {
     setTogglingId(event.id);
     try {
       const response = await fetch(`/api/admin/events/${event.id}`, {
@@ -121,35 +148,57 @@ export default function EventsManager() {
 
       if (response.ok) {
         await fetchEvents();
+        addToast({
+          variant: 'success',
+          message: `“${event.title}” ${next ? 'activated' : 'deactivated'}`,
+        });
       } else {
         const data = await response.json();
-        alert(data.message || 'Failed to update event');
+        addToast({ variant: 'danger', message: data.message || 'Failed to update event' });
       }
     } catch {
-      alert('An error occurred. Please try again.');
+      addToast({ variant: 'danger', message: 'An error occurred. Please try again.' });
     } finally {
       setTogglingId(null);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this event?')) {
-      return;
+  const handleToggleActive = (event: Event) => {
+    // Deactivating hides the event publicly, so confirm first; activating is safe.
+    if (event.isActive) {
+      setPending({ kind: 'deactivate', event });
+    } else {
+      setActive(event, true);
     }
+  };
 
+  const handleDelete = async (event: Event) => {
     try {
-      const response = await fetch(`/api/admin/events/${id}`, {
+      const response = await fetch(`/api/admin/events/${event.id}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
         await fetchEvents();
+        addToast({ variant: 'success', message: `“${event.title}” deleted` });
       } else {
-        alert('Failed to delete event');
+        addToast({ variant: 'danger', message: 'Failed to delete event' });
       }
     } catch (err) {
-      alert('An error occurred. Please try again.');
+      addToast({ variant: 'danger', message: 'An error occurred. Please try again.' });
     }
+  };
+
+  const confirmPending = async () => {
+    if (!pending) return;
+    setConfirming(true);
+    if (pending.kind === 'delete') {
+      await handleDelete(pending.event);
+    } else {
+      await setActive(pending.event, false);
+    }
+    setConfirming(false);
+    setPending(null);
   };
 
   const resetForm = () => {
@@ -166,224 +215,177 @@ export default function EventsManager() {
     setError('');
   };
 
-  if (loading) {
-    return <div>Loading events...</div>;
-  }
-
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-bold">Events Management</h3>
-        <button
+    <Column gap="24">
+      <Row horizontal="between" vertical="end" gap="16" s={{ direction: 'column', horizontal: 'start' }}>
+        <Column gap="4">
+          <Heading as="h2" variant="heading-strong-l">
+            Events
+          </Heading>
+          <Text variant="body-default-s" onBackground="neutral-weak">
+            Inactive events are hidden from the public site and closed to new registrations.
+          </Text>
+        </Column>
+        <Button
+          prefixIcon="plus"
           onClick={() => {
             resetForm();
             setShowForm(true);
           }}
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
         >
-          + Add New Event
-        </button>
-      </div>
+          Add event
+        </Button>
+      </Row>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="mb-6 p-4 border rounded">
-          <h4 className="font-bold mb-4">
-            {editingEvent ? 'Edit Event' : 'Create New Event'}
-          </h4>
-          {error && (
-            <div className="mb-4 text-red-600 text-sm">{error}</div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Title *</label>
-              <input
-                type="text"
-                required
-                className="w-full border rounded px-3 py-2"
-                value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
+      <Table
+        loading={loading}
+        data={{
+          headers: [
+            { content: 'Title', key: 'title' },
+            { content: 'Date', key: 'date' },
+            { content: 'Location', key: 'location', hide: { m: true } },
+            { content: 'Seats', key: 'seats', align: 'right' },
+            { content: 'Program', key: 'program', hide: { s: true } },
+            { content: 'Status', key: 'status' },
+          ],
+          rows: events.map((event) => [
+            <Text key="title" variant="label-strong-s">{event.title}</Text>,
+            formatNyDateTimeTable(event.date),
+            event.location,
+            event.maxSeats,
+            <Tag key="program" size="s" scheme={event.program === 'AdultEd' ? 'accent' : 'brand'}>
+              {event.program}
+            </Tag>,
+            <Row key="status" gap="12" vertical="center">
+              <Switch
+                checked={event.isActive}
+                loading={togglingId === event.id}
+                disabled={togglingId === event.id}
+                ariaLabel={`${event.isActive ? 'Deactivate' : 'Activate'} ${event.title}`}
+                onToggle={() => handleToggleActive(event)}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Date & Time * <span className="font-normal text-gray-500">(Eastern — New York)</span>
-              </label>
-              <input
+              <Tag size="s" scheme={event.isActive ? 'success' : 'neutral'}>
+                {event.isActive ? 'Active' : 'Inactive'}
+              </Tag>
+            </Row>,
+          ]),
+        }}
+        actions={[
+          {
+            icon: 'edit',
+            tooltip: 'Edit event',
+            onClick: (row) => handleEdit(events[row]),
+          },
+          {
+            icon: 'trash',
+            tooltip: 'Delete event',
+            variant: 'danger',
+            onClick: (row) => setPending({ kind: 'delete', event: events[row] }),
+          },
+        ]}
+        emptyState={
+          <Column center gap="12" padding="32">
+            <Text variant="body-default-s" onBackground="neutral-weak">
+              No events yet.
+            </Text>
+            <Button size="s" variant="secondary" prefixIcon="plus" onClick={() => setShowForm(true)}>
+              Create your first event
+            </Button>
+          </Column>
+        }
+      />
+
+      <Dialog
+        open={showForm}
+        onClose={resetForm}
+        title={editingEvent ? 'Edit event' : 'Create event'}
+        description={editingEvent ? editingEvent.title : 'Add a new event to the public listing.'}
+      >
+        <form onSubmit={handleSubmit}>
+          <Column gap="16" paddingTop="8">
+            <Input
+              id="event-title"
+              label="Title"
+              required
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            />
+            <Grid columns="2" gap="16" s={{ columns: 1 }}>
+              <Input
+                id="event-date"
                 type="datetime-local"
+                label="Date & time (Eastern)"
+                // A placeholder keeps the label floated above the browser's date mask.
+                placeholder=" "
                 required
-                className="w-full border rounded px-3 py-2"
                 value={formData.date}
-                onChange={(e) =>
-                  setFormData({ ...formData, date: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                description="Stored as New York time, wherever you are."
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Enter the event start time in Eastern Time (EST/EDT). It is stored correctly even if you are not in New York.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Location *
-              </label>
-              <input
-                type="text"
-                required
-                className="w-full border rounded px-3 py-2"
-                value={formData.location}
-                onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Max Seats *
-              </label>
-              <input
+              <Input
+                id="event-seats"
                 type="number"
+                label="Max seats"
+                min={1}
                 required
-                min="1"
-                className="w-full border rounded px-3 py-2"
                 value={formData.maxSeats}
-                onChange={(e) =>
-                  setFormData({ ...formData, maxSeats: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, maxSeats: e.target.value })}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Program *
-              </label>
-              <select
-                required
-                className="w-full border rounded px-3 py-2"
+            </Grid>
+            <Input
+              id="event-location"
+              label="Location"
+              required
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            />
+            <Column gap="8">
+              <Text variant="label-default-s" onBackground="neutral-weak">
+                Program
+              </Text>
+              <SegmentedControl
+                fillWidth={false}
+                semantics="radio"
                 value={formData.program}
-                onChange={(e) =>
-                  setFormData({ ...formData, program: e.target.value })
-                }
-              >
-                <option value="No-AdultEd">No-AdultEd</option>
-                <option value="AdultEd">AdultEd</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-1">
-                Description *
-              </label>
-              <textarea
-                required
-                rows={3}
-                className="w-full border rounded px-3 py-2"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
+                onChange={(value) => setFormData({ ...formData, program: value })}
+                buttons={PROGRAM_OPTIONS}
               />
-            </div>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
-              {editingEvent ? 'Update Event' : 'Create Event'}
-            </button>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-          </div>
+            </Column>
+            <Textarea
+              id="event-description"
+              label="Description"
+              lines={4}
+              required
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            />
+            {error && <Feedback variant="danger" description={error} />}
+            <Row horizontal="end" gap="8" paddingTop="8">
+              <Button type="button" variant="secondary" onClick={resetForm} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={saving}>
+                {editingEvent ? 'Save changes' : 'Create event'}
+              </Button>
+            </Row>
+          </Column>
         </form>
-      )}
+      </Dialog>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-4 py-2 text-left">Title</th>
-              <th className="px-4 py-2 text-left">Date</th>
-              <th className="px-4 py-2 text-left">Location</th>
-              <th className="px-4 py-2 text-left">Max Seats</th>
-              <th className="px-4 py-2 text-left">Program</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {events.map((event) => (
-              <tr
-                key={event.id}
-                className={event.isActive === false ? 'bg-gray-50 text-gray-600' : ''}
-              >
-                <td className="px-4 py-2">{event.title}</td>
-                <td className="px-4 py-2">
-                  {formatNyDateTimeTable(event.date)}
-                </td>
-                <td className="px-4 py-2">{event.location}</td>
-                <td className="px-4 py-2">{event.maxSeats}</td>
-                <td className="px-4 py-2">{event.program}</td>
-                <td className="px-4 py-2">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        event.isActive !== false
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {event.isActive !== false ? 'Active' : 'Inactive'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleActive(event)}
-                      disabled={togglingId === event.id}
-                      className={`px-3 py-1 rounded text-sm font-medium disabled:opacity-50 ${
-                        event.isActive !== false
-                          ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-                          : 'bg-green-100 text-green-900 hover:bg-green-200'
-                      }`}
-                    >
-                      {togglingId === event.id
-                        ? '…'
-                        : event.isActive !== false
-                          ? 'Deactivate'
-                          : 'Activate'}
-                    </button>
-                  </div>
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEdit(event)}
-                      className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(event.id)}
-                      className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {events.length === 0 && (
-              <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-500">
-                  No events found. Create your first event!
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <ConfirmDialog
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        loading={confirming}
+        tone={pending?.kind === 'delete' ? 'danger' : 'primary'}
+        title={pending?.kind === 'delete' ? 'Delete event?' : 'Deactivate event?'}
+        description={
+          pending?.kind === 'delete'
+            ? `“${pending.event.title}” will be permanently deleted.`
+            : `“${pending?.event.title}” will be hidden from the public site and new registrations will be blocked.`
+        }
+        confirmLabel={pending?.kind === 'delete' ? 'Delete' : 'Deactivate'}
+        onConfirm={confirmPending}
+      />
+    </Column>
   );
 }

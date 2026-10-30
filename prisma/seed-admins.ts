@@ -109,7 +109,12 @@ async function main() {
     }
 
     console.log('Admin users seeded successfully!');
-    console.log(`Default password: ${defaultPassword}`);
+    // Never print the password itself; it can come from ADMIN_PASSWORD and end up in CI logs.
+    console.log(
+      process.env.ADMIN_PASSWORD
+        ? 'Password: value of the ADMIN_PASSWORD environment variable.'
+        : 'Password: the built-in default (set ADMIN_PASSWORD to override).'
+    );
     console.log('Please change the password after first login.');
     
   } catch (error) {

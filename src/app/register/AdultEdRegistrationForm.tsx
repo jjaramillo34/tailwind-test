@@ -1,7 +1,21 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Button,
+  Column,
+  Feedback,
+  Grid,
+  Heading,
+  Input,
+  NumberInput,
+  Row,
+  Select,
+  Text,
+} from "@once-ui-system/core";
 import { formatNyDateLong, formatNyTime } from "@/lib/nyDatetime";
+import { NYC_DOE_EMAIL_SUFFIX, SCHOOL_OPTIONS } from "@/lib/schools";
+import { SiteHeader } from "@/components/SiteHeader";
 
 type EventWithProgram = {
   _id: string;
@@ -18,26 +32,7 @@ interface AdultEdRegistrationFormProps {
   events: EventWithProgram[];
 }
 
-const SCHOOLS = [
-  'P2G MANHATTAN',
-  'P2G BROOKLYN',
-  'P2G QUEENS',
-  'P2G STATEN ISLAND',
-  'P2G BRONX',
-  'LYFE',
-  'RESTART',
-  'COOP TECH',
-  'PASSAGES BRONX',
-  'PASSAGES BROOKLYN',
-  'ALC QUEENS',
-  'SCHOOL 1',
-  'SCHOOL 2',
-  'SCHOOL 3',
-  'SCHOOL 4',
-  'SCHOOL 5',
-  'SCHOOL 6',
-  'SCHOOL 8',
-];
+const MAX_TICKETS = 10;
 
 export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationFormProps) {
   const router = useRouter();
@@ -53,6 +48,7 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
     adultEdNote: ""
   });
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ school?: string; eventId?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventWithProgram | null>(null);
   useEffect(() => { setIsClient(true); }, []);
@@ -61,9 +57,17 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const missing = {
+      school: formData.school ? undefined : "Please select your school",
+      eventId: selectedEvent ? undefined : "Please select an event",
+    };
+    setFieldErrors(missing);
+    if (missing.school || missing.eventId) return;
+
     setIsSubmitting(true);
     try {
-      if (!formData.email.endsWith("@schools.nyc.gov")) {
+      if (!formData.email.endsWith(NYC_DOE_EMAIL_SUFFIX)) {
         throw new Error("Please use a valid NYC Department of Education email address (@schools.nyc.gov)");
       }
       if (!selectedEvent) {
@@ -76,8 +80,8 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
       if (requestedTickets > selectedEvent.availableTickets) {
         throw new Error(`Only ${selectedEvent.availableTickets} tickets available for this event`);
       }
-      if (requestedTickets > 10) {
-        throw new Error('You can request a maximum of 10 tickets per registration');
+      if (requestedTickets > MAX_TICKETS) {
+        throw new Error(`You can request a maximum of ${MAX_TICKETS} tickets per registration`);
       }
       const response = await fetch("/api/register", {
         method: "POST",
@@ -104,87 +108,115 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    if (name === "eventId") {
-      const event = events.find(e => e._id.toString() === value);
-      setSelectedEvent(event || null);
-    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleEventSelect = (value: string) => {
+    const event = events.find(e => e._id.toString() === value);
+    setSelectedEvent(event || null);
+    setFormData(prev => ({ ...prev, eventId: value }));
+    setFieldErrors(prev => ({ ...prev, eventId: undefined }));
+  };
+
+  const eventOptions = events
+    .filter(event => event.availableTickets > 0)
+    .map(event => ({
+      value: event._id,
+      label: event.title,
+      description: `${formatNyDateLong(event.date)} at ${formatNyTime(event.date)} · ${event.availableTickets} available`,
+    }));
+
+  const emailInvalid = formData.email.includes("@") && !formData.email.endsWith(NYC_DOE_EMAIL_SUFFIX);
+  const maxTickets = selectedEvent ? Math.min(selectedEvent.availableTickets, MAX_TICKETS) : MAX_TICKETS;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h2 className="mb-6 text-center text-2xl font-bold text-gray-900">New AdultEd Event Registration</h2>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">First Name</label>
-              <input id="firstName" name="firstName" type="text" required className="mt-1 block w-full" value={formData.firstName} onChange={handleChange} />
-            </div>
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">Last Name</label>
-              <input id="lastName" name="lastName" type="text" required className="mt-1 block w-full" value={formData.lastName} onChange={handleChange} />
-            </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address</label>
-              <input id="email" name="email" type="email" required className="mt-1 block w-full" value={formData.email} onChange={handleChange} />
-            </div>
-            <div>
-              <label htmlFor="school" className="block text-sm font-medium text-gray-700">School Name</label>
-              <select
-                id="school"
-                name="school"
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                value={formData.school}
-                onChange={handleChange}
-              >
-                <option value="">-- Select your school --</option>
-                {SCHOOLS.sort().map((school: string) => (
-                  <option key={school} value={school}>
-                    {school}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="position" className="block text-sm font-medium text-gray-700">Position</label>
-              <input id="position" name="position" type="text" required className="mt-1 block w-full" value={formData.position} onChange={handleChange} />
-            </div>
-            <div>
-              <label htmlFor="eventId" className="block text-sm font-medium text-gray-700">Select Event</label>
-              <select id="eventId" name="eventId" required className="mt-1 block w-full" value={formData.eventId} onChange={handleChange}>
-                <option value="">Select an event</option>
-                {events.filter(event => event.availableTickets > 0).map(event => (
-                  <option key={event._id} value={event._id}>
-                    {event.title} - {formatNyDateLong(event.date)} at {formatNyTime(event.date)} (Available: {event.availableTickets})
-                  </option>
-                ))}
-              </select>
-            </div>
-            {selectedEvent && (
-              <div>
-                <label htmlFor="ticketQuantity" className="block text-sm font-medium text-gray-700">Number of Tickets</label>
-                <input id="ticketQuantity" name="ticketQuantity" type="number" min="1" max={Math.min(selectedEvent.availableTickets, 10)} required className="mt-1 block w-full" value={formData.ticketQuantity} onChange={handleChange} />
-                <p className="mt-1 text-sm text-gray-500">Maximum {Math.min(selectedEvent.availableTickets, 10)} tickets per registration (event has {selectedEvent.availableTickets} available)</p>
-              </div>
-            )}
-            {/* AdultEd-specific note/field */}
-            <div>
-              <label htmlFor="adultEdNote" className="block text-sm font-medium text-gray-700">AdultEd Note (optional)</label>
-              <input id="adultEdNote" name="adultEdNote" type="text" className="mt-1 block w-full" value={formData.adultEdNote} onChange={handleChange} />
-            </div>
-          </div>
-          {error && <div className="text-red-500 text-sm text-center p-4 bg-red-50 rounded-md">{error}</div>}
-          <div>
-            <button type="submit" disabled={isSubmitting} className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md">
-              {isSubmitting ? "Registering..." : "Register for New AdultEd Event"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <>
+      <SiteHeader />
+      <Column as="main" fillWidth horizontal="center" paddingY="48" paddingX="16">
+        <Column maxWidth="s" gap="24">
+          <Column gap="8" horizontal="center" align="center">
+            <Text variant="label-default-s" onBackground="brand-medium">
+              Adult Education
+            </Text>
+            <Heading as="h1" variant="display-strong-xs">
+              AdultEd event registration
+            </Heading>
+            <Text variant="body-default-m" onBackground="neutral-weak">
+              Reserve tickets for an upcoming AdultEd event.
+            </Text>
+          </Column>
+
+          <Column background="surface" border radius="l" padding="32" s={{ padding: "20" }}>
+            <form onSubmit={handleSubmit}>
+              <Column gap="16">
+                <Grid columns="2" gap="16" s={{ columns: 1 }}>
+                  <Input id="firstName" name="firstName" label="First name" required autoComplete="given-name" value={formData.firstName} onChange={handleChange} />
+                  <Input id="lastName" name="lastName" label="Last name" required autoComplete="family-name" value={formData.lastName} onChange={handleChange} />
+                </Grid>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  label="Email address"
+                  required
+                  autoComplete="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  error={emailInvalid}
+                  errorMessage={emailInvalid ? "Use your @schools.nyc.gov address" : undefined}
+                  description={emailInvalid ? undefined : "Must be a @schools.nyc.gov email address"}
+                />
+                <Select
+                  id="school"
+                  label="School"
+                  searchable
+                  options={SCHOOL_OPTIONS}
+                  value={formData.school}
+                  onSelect={(value) => {
+                    setFormData(prev => ({ ...prev, school: value as string }));
+                    setFieldErrors(prev => ({ ...prev, school: undefined }));
+                  }}
+                  error={!!fieldErrors.school}
+                  errorMessage={fieldErrors.school}
+                />
+                <Input id="position" name="position" label="Position" required autoComplete="organization-title" value={formData.position} onChange={handleChange} />
+                <Select
+                  id="eventId"
+                  label="Event"
+                  options={eventOptions}
+                  value={formData.eventId}
+                  onSelect={(value) => handleEventSelect(value as string)}
+                  emptyState="No AdultEd events are open right now"
+                  error={!!fieldErrors.eventId}
+                  errorMessage={fieldErrors.eventId}
+                />
+                {selectedEvent && (
+                  <NumberInput
+                    id="ticketQuantity"
+                    label="Number of tickets"
+                    min={1}
+                    max={maxTickets}
+                    value={parseInt(formData.ticketQuantity) || 1}
+                    onChange={(value) => setFormData(prev => ({ ...prev, ticketQuantity: String(value) }))}
+                    description={`Up to ${maxTickets} per registration (${selectedEvent.availableTickets} available)`}
+                  />
+                )}
+                <Input id="adultEdNote" name="adultEdNote" label="Note (optional)" value={formData.adultEdNote} onChange={handleChange} />
+
+                {error && <Feedback variant="danger" description={error} />}
+
+                <Row paddingTop="8">
+                  <Button type="submit" fillWidth size="l" loading={isSubmitting} disabled={isSubmitting}>
+                    {isSubmitting ? "Registering…" : "Register for AdultEd event"}
+                  </Button>
+                </Row>
+              </Column>
+            </form>
+          </Column>
+        </Column>
+      </Column>
+    </>
   );
-} 
+}

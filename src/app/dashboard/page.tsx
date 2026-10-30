@@ -1,4 +1,7 @@
+import { Column, Grid, Heading, Icon, Row, Text, ThemeSwitcher } from '@once-ui-system/core';
+import type { IconName } from '@once-ui-system/core';
 import connectDB from '@/lib/mongodb';
+import Event, { activeEventFilter } from '@/lib/models/Event';
 import EventsRegistration from '@/lib/models/EventsRegistration';
 import RegistrationsTable from './RegistrationsTable';
 import EventsManager from './EventsManager';
@@ -10,6 +13,20 @@ import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
+function StatCard({ icon, label, value }: { icon: IconName; label: string; value: number }) {
+  return (
+    <Column background="surface" border radius="l" padding="20" gap="8">
+      <Row gap="8" vertical="center">
+        <Icon name={icon} size="xs" onBackground="brand-medium" />
+        <Text variant="label-default-s" onBackground="neutral-weak">
+          {label}
+        </Text>
+      </Row>
+      <Text variant="display-strong-xs">{value.toLocaleString('en-US')}</Text>
+    </Column>
+  );
+}
+
 export default async function DashboardPage() {
   const isAuthenticated = await isAdminAuthenticated();
   
@@ -20,9 +37,10 @@ export default async function DashboardPage() {
   await connectDB();
   
   // Fetch all registrations with event info
-  const registrations = await EventsRegistration.find({})
-    .populate('eventId')
-    .sort({ createdAt: 'desc' });
+  const [registrations, activeEventCount] = await Promise.all([
+    EventsRegistration.find({}).populate('eventId').sort({ createdAt: 'desc' }),
+    Event.countDocuments(activeEventFilter),
+  ]);
 
   // Convert dates to string for client component.
   // Some registrations can reference events that were deleted; populate() returns null in that case.
@@ -58,25 +76,40 @@ export default async function DashboardPage() {
     };
   });
 
+  const totalTickets = registrationsForClient.reduce((sum, r) => sum + r.ticketQuantity, 0);
+  const schoolCount = new Set(registrationsForClient.map((r) => r.school)).size;
+
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl w-full mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Admin Dashboard</h2>
-          <LogoutButton />
-        </div>
-        
+    <Column as="main" fillWidth horizontal="center" paddingY="40" paddingX="24" s={{ paddingX: '16' }}>
+      <Column maxWidth="xl" gap="32">
+        <Row horizontal="between" vertical="center" gap="16" wrap>
+          <Column gap="4">
+            <Text variant="label-default-s" onBackground="brand-medium">
+              District 79 Arts Grant Events
+            </Text>
+            <Heading as="h1" variant="display-strong-xs">
+              Admin dashboard
+            </Heading>
+          </Column>
+          <Row gap="8" vertical="center">
+            <ThemeSwitcher />
+            <LogoutButton />
+          </Row>
+        </Row>
+
+        <Grid columns="4" gap="12" m={{ columns: 2 }}>
+          <StatCard icon="calendar" label="Active events" value={activeEventCount} />
+          <StatCard icon="document" label="Registrations" value={registrationsForClient.length} />
+          <StatCard icon="ticket" label="Tickets reserved" value={totalTickets} />
+          <StatCard icon="organization" label="Schools registered" value={schoolCount} />
+        </Grid>
+
         <DashboardTabs
           eventsContent={<EventsManager />}
-          registrationsContent={
-            <div>
-              <h3 className="text-xl font-bold mb-4">Registrations</h3>
-              <RegistrationsTable registrations={registrationsForClient} />
-            </div>
-          }
+          registrationsContent={<RegistrationsTable registrations={registrationsForClient} />}
           settingsContent={<SettingsTab />}
         />
-      </div>
-    </div>
+      </Column>
+    </Column>
   );
-} 
+}

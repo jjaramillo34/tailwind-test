@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { Button, Column, Feedback, Heading, Input, PasswordInput, Text } from '@once-ui-system/core';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,63 +40,45 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Admin Login
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your email and password to access the dashboard
-          </p>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
+    <Column as="main" fillWidth center paddingX="16" paddingY="48" style={{ minHeight: '100vh' }}>
+      <Column maxWidth={26} background="surface" border radius="xl" padding="32" gap="24">
+        <Column horizontal="center" align="center" gap="12">
+          <Image src="/images/d79logo.png" alt="District 79 logo" width={96} height={48} priority />
+          <Heading as="h1" variant="heading-strong-xl">
+            Admin sign in
+          </Heading>
+          <Text variant="body-default-s" onBackground="neutral-weak">
+            Enter your email and password to access the dashboard.
+          </Text>
+        </Column>
+        <form onSubmit={handleSubmit}>
+          <Column gap="16">
+            <Input
               id="email"
               name="email"
               type="email"
+              label="Email"
+              autoComplete="username"
               required
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="your.email@schools.nyc.gov"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
+              label="Password"
+              autoComplete="current-password"
               required
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-          </div>
-
-          {error && (
-            <div className="text-red-600 text-sm text-center">{error}</div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Logging in...' : 'Sign in'}
-            </button>
-          </div>
+            {error && <Feedback variant="danger" description={error} />}
+            <Button type="submit" fillWidth size="l" loading={loading} disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </Column>
         </form>
-      </div>
-    </div>
+      </Column>
+    </Column>
   );
 }
