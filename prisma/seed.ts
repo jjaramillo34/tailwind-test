@@ -1,103 +1,117 @@
-const { PrismaClient } = require('@prisma/client');
+import mongoose, { Schema, Model } from 'mongoose';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-const prisma = new PrismaClient();
+// Load environment variables
+const envPath = path.resolve(__dirname, '../.env.local');
+dotenv.config({ path: envPath });
+dotenv.config(); // Also load .env if it exists
+
+// MongoDB connection
+const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || '';
+
+if (!MONGODB_URI) {
+  throw new Error('Please define the MONGODB_URI or DATABASE_URL environment variable inside .env.local');
+}
+
+// Event Schema
+const EventSchema = new Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    date: {
+      type: Date,
+      required: true,
+    },
+    location: {
+      type: String,
+      required: true,
+    },
+    maxSeats: {
+      type: Number,
+      required: true,
+    },
+    program: {
+      type: String,
+      default: 'No-AdultEd',
+      enum: ['AdultEd', 'No-AdultEd'],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const Event: Model<any> = mongoose.models.Event || mongoose.model('Event', EventSchema);
 
 async function main() {
-  // Clear existing data
-  await prisma.eventsRegistration.deleteMany();
-  await prisma.event.deleteMany();
+  try {
+    await mongoose.connect(MONGODB_URI);
+    console.log('Connected to MongoDB');
 
-  // Create sample events
-  const events = [
-    {
-      title: 'MJ The Musical',
-      description: 'Featuring a book by two-time Pulitzer Prize winner Lynn Nottage and Tony Award®-winning choreography from director Christopher Wheeldon, MJ goes beyond the singular moves and signature sound of the star, offering a rare look at the creative mind and collaborative spirit that catapulted Michael Jackson into legendary status.',
-      date: new Date('2025-06-11T14:00:00Z'),
-      location: 'Broadway',
-      maxSeats: 66,
-      program: 'No-AdultEd',
-    },
-    {
-      title: 'Harry Potter and the Cursed Child',
-      description: 'There\'s more magic in every moment at Harry Potter and the Cursed Child, the 8th story in the Harry Potter series and the most awarded new play in history. Now playing live on Broadway eight times a week at the Lyric Theatre.',
-      date: new Date('2025-05-28T14:00:00Z'),
-      location: 'Lyric Theatre',
-      maxSeats: 36,
-      program: 'No-AdultEd',
-    },
-    {
-      title: 'Stranger Things',
-      description: 'STRANGER THINGS: THE FIRST SHADOW astonished the West End, winning the Olivier Award for Best Entertainment. Critics hailed it as "a game-changing experience" that makes the unimaginable real and "takes theatre to the next dimension".',
-      date: new Date('2025-06-04T14:00:00Z'),
-      location: 'Broadway',
-      maxSeats: 35,
-      program: 'No-AdultEd',
-    },
-    {
-      title: 'One World Observatory',
-      description: 'One World Observatory experience. Lunch will be provided for all! Staten Island will receive priority tickets.',
-      date: new Date('2025-06-13T11:00:00Z'),
-      location: 'One World Trade Center',
-      maxSeats: 35,
-      program: 'No-AdultEd',
-    },
-    {
-      title: 'One World Observatory',
-      description: 'One World Observatory experience. Lunch will be provided for all! Staten Island will receive priority tickets.',
-      date: new Date('2025-06-13T13:00:00Z'),
-      location: 'One World Trade Center',
-      maxSeats: 35,
-      program: 'No-AdultEd',
-    },
-    {
-      title: 'Lion King',
-      description: 'Since opening on Broadway in November 1997, THE LION KING has become the most successful musical in history. It currently plays 8 times a week at the Minskoff Theatre, in the heart of Times Square.',
-      date: new Date('2025-05-21T14:00:00Z'),
-      location: 'Minskoff Theatre',
-      maxSeats: 35,
-      program: 'No-AdultEd',
-    },
-    // AdultEd events
-    {
-      title: 'Hells Kitchen (Evening)',
-      description: 'Hells Kitchen (Evening) - AdultEd program event.',
-      date: new Date('2025-06-04T19:30:00Z'),
-      location: 'Broadway',
-      maxSeats: 46,
-      program: 'AdultEd',
-    },
-    {
-      title: 'Group Trip (Evening)',
-      description: 'Group Trip (Evening) - AdultEd program event.',
-      date: new Date('2025-06-13T18:00:00Z'),
-      location: 'Various',
-      maxSeats: 75,
-      program: 'AdultEd',
-    },
-    {
-      title: 'Death Becomes Her (Evening)',
-      description: 'Death Becomes Her (Evening) - AdultEd program event.',
-      date: new Date('2025-05-21T19:30:00Z'),
-      location: 'Broadway',
-      maxSeats: 55,
-      program: 'AdultEd',
-    },
-    {
-      title: 'Belongó',
-      description: 'Belongó is dedicated to performing, educating about, and preserving the music of all of the Americas, emanating from African and indigenous roots, through the entry point of jazz.',
-      date: new Date('2025-06-15T15:00:00Z'),
-      location: 'Various Schools',
-      maxSeats: 4,
-    },
-  ];
+    // Clear all existing events (optional - comment out if you want to keep existing data)
+    // await mongoose.model('EventsRegistration').deleteMany({});
+    // await Event.deleteMany({});
 
-  for (const event of events) {
-    await prisma.event.create({
-      data: event,
-    });
+    // 2026 Events
+    const events = [
+      {
+        title: 'Wicked',
+        description: 'Wicked - Broadway musical at the Gershwin Theatre. The untold story of the witches of Oz.',
+        date: new Date('2026-03-11T18:00:00Z'), // March 11, 2026 at 2:00 p.m. (14:00 EST = 18:00 UTC, accounting for EDT)
+        location: 'Gershwin Theatre - 222 West 51st Street New York, NY 10019',
+        maxSeats: 81,
+        program: 'No-AdultEd',
+      },
+      {
+        title: 'Intrepid Museum Experience',
+        description: 'Intrepid Museum experience at Pier 86. Explore the aircraft carrier Intrepid, a National Historic Landmark.',
+        date: new Date('2026-03-11T14:30:00Z'), // March 11, 2026 at 10:30 a.m. (10:30 EST = 14:30 UTC, accounting for EDT)
+        location: 'Intrepid Museum - Pier 86 @ 12th Avenue & 46th Street New York, NY 10036',
+        maxSeats: 60,
+        program: 'No-AdultEd',
+      },
+      {
+        title: 'Hamilton',
+        description: 'Hamilton - The revolutionary Broadway musical about Alexander Hamilton.',
+        date: new Date('2026-04-15T17:00:00Z'), // April 15, 2026 at 1:00 p.m. (13:00 EST = 17:00 UTC, accounting for EDT)
+        location: '226 West 46th Street New York, NY 10036',
+        maxSeats: 60,
+        program: 'No-AdultEd',
+      },
+      {
+        title: 'Sloomoo Institute Experience',
+        description: 'Sloomoo Institute - SoHo New York experience. An immersive, multi-sensory experience celebrating slime.',
+        date: new Date('2026-03-27T16:00:00Z'), // March 27, 2026 - Time TBD, using 12:00 p.m. (noon) as default (12:00 EST = 16:00 UTC, accounting for EDT)
+        location: 'Sloomoo Institute - SoHo New York 475 Broadway New York, NY 10013',
+        maxSeats: 75,
+        program: 'No-AdultEd',
+      },
+    ];
+
+    // Delete all existing events before inserting new ones
+    try {
+      await Event.deleteMany({});
+      console.log('Deleted all existing events.');
+    } catch (error) {
+      console.log('No events to delete or error occurred:', error);
+    }
+
+    // Insert all 2026 events
+    const createdEvents = await Event.insertMany(events);
+    console.log(`Created ${createdEvents.length} events for 2026.`);
+
+    console.log('Seed completed successfully!');
+  } catch (error) {
+    console.error('Seed error:', error);
+    throw error;
   }
-
-  console.log('Database has been seeded. 🌱');
 }
 
 main()
@@ -106,5 +120,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await mongoose.connection.close();
   });

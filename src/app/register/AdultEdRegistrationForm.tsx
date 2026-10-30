@@ -1,9 +1,15 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Event } from "@prisma/client";
+import { formatNyDateLong, formatNyTime } from "@/lib/nyDatetime";
 
-type EventWithProgram = Event & { 
+type EventWithProgram = {
+  _id: string;
+  title: string;
+  description: string;
+  date: Date | string;
+  location: string;
+  maxSeats: number;
   program: string;
   availableTickets: number;
 };
@@ -11,6 +17,27 @@ type EventWithProgram = Event & {
 interface AdultEdRegistrationFormProps {
   events: EventWithProgram[];
 }
+
+const SCHOOLS = [
+  'P2G MANHATTAN',
+  'P2G BROOKLYN',
+  'P2G QUEENS',
+  'P2G STATEN ISLAND',
+  'P2G BRONX',
+  'LYFE',
+  'RESTART',
+  'COOP TECH',
+  'PASSAGES BRONX',
+  'PASSAGES BROOKLYN',
+  'ALC QUEENS',
+  'SCHOOL 1',
+  'SCHOOL 2',
+  'SCHOOL 3',
+  'SCHOOL 4',
+  'SCHOOL 5',
+  'SCHOOL 6',
+  'SCHOOL 8',
+];
 
 export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationFormProps) {
   const router = useRouter();
@@ -57,7 +84,7 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          eventId: selectedEvent.id,
+          eventId: selectedEvent._id,
           ticketQuantity: requestedTickets
         })
       });
@@ -80,7 +107,7 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === "eventId") {
-      const event = events.find(e => e.id.toString() === value);
+      const event = events.find(e => e._id.toString() === value);
       setSelectedEvent(event || null);
     }
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -89,7 +116,7 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h2 className="mb-6 text-center text-2xl font-bold text-gray-900">AdultEd Event Registration</h2>
+        <h2 className="mb-6 text-center text-2xl font-bold text-gray-900">New AdultEd Event Registration</h2>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
@@ -106,7 +133,21 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
             </div>
             <div>
               <label htmlFor="school" className="block text-sm font-medium text-gray-700">School Name</label>
-              <input id="school" name="school" type="text" required className="mt-1 block w-full" value={formData.school} onChange={handleChange} />
+              <select
+                id="school"
+                name="school"
+                required
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                value={formData.school}
+                onChange={handleChange}
+              >
+                <option value="">-- Select your school --</option>
+                {SCHOOLS.sort().map((school: string) => (
+                  <option key={school} value={school}>
+                    {school}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="position" className="block text-sm font-medium text-gray-700">Position</label>
@@ -117,8 +158,8 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
               <select id="eventId" name="eventId" required className="mt-1 block w-full" value={formData.eventId} onChange={handleChange}>
                 <option value="">Select an event</option>
                 {events.filter(event => event.availableTickets > 0).map(event => (
-                  <option key={event.id} value={event.id}>
-                    {event.title} - {new Date(event.date).toLocaleDateString()} (Available: {event.availableTickets})
+                  <option key={event._id} value={event._id}>
+                    {event.title} - {formatNyDateLong(event.date)} at {formatNyTime(event.date)} (Available: {event.availableTickets})
                   </option>
                 ))}
               </select>
@@ -139,7 +180,7 @@ export default function AdultEdRegistrationForm({ events }: AdultEdRegistrationF
           {error && <div className="text-red-500 text-sm text-center p-4 bg-red-50 rounded-md">{error}</div>}
           <div>
             <button type="submit" disabled={isSubmitting} className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md">
-              {isSubmitting ? "Registering..." : "Register for AdultEd Event"}
+              {isSubmitting ? "Registering..." : "Register for New AdultEd Event"}
             </button>
           </div>
         </form>
